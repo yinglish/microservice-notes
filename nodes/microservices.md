@@ -2,6 +2,55 @@
 
 ## Spring Cloud
 
+### Zuul的工作原理
+
+Zuul的核心是一系列的过滤器，它们在HTTP的请求与响应的路由过程中发挥作用。
+
+Zuul过滤器的核心是：
+* Type:
+* Execution Order:
+* Criteria:
+* Action:
+
+Zuul 提供一个动态读取、编译、运行过滤器的框架，过滤器之间不能直接通信，它们是通过`RequestContext`状态共享实现的，每个请求的`RequestContext`是唯一的。
+
+Filters目前是用`Groovy`写的，但是支持任何基于JVM-based的语言。过滤器的源码位于Zuul服务器的指定目录下，Zuul服务器会定期检测变化。修改后，Zuul会从硬盘读取文件并编译，接下来要处理的请求会调用这些过滤器。
+
+**Filter Types**
+
+* PRE Filters: 在路由之前执行，使用例子：请求鉴权，选择服务器，日志信息记录
+* ROUTING Filters: 在进行路由时执行，原始http请求在这里被创建，并使用Apache HttpClient或Netflix Ribbon进行发送。
+* POST Filters: 在请求路由后执行，使用例子：给响应添加标准的HTTP头，聚合统计数据与metrics，streaming the response from the origin to the client.
+* ERROR Filters：上述阶段发生错误时执行
+
+**Netflix实践介绍**
+
+Zuul结合其他的Netflix OSS组件能够提供insight, flexibility, and resilliency.
+* Hystrix： wrap calls to origins, to shed and prioritize traffic when issues occur
+* Ribbon: client for all outbond requests from Zuul, 提供网络性能、错误的详细信息，也能实现软件负载均衡
+* Turbine：聚合实时的细粒度度量，可以快速观察或响应问题
+* Archaius：处理配置，提供动态改变属性的能力
+
+**Surgical Routing 外科手术式路由**
+
+可以创建过滤器，将特定的消费者或设备路由到不同的API集群。
+
+**压力测试**
+
+设置一个自动的过程，在Zuul过滤器中使用动态的Archaius的配置，平稳的增加路由到一个小集群的流量，测试性能，调整自动扩容策略。
+
+**Multi-Region Resiliency**
+
+跨区域冗余
+
+* Debug日志信息：默认开启
+  * ZUUL_DEBUG: Filters的信息，修改RequestContext
+  * REQUEST_DEBUG: 关于HTTP请求与响应的信息
+    * REQUEST:
+    * ZUUL:
+    * ORIGIN_RESPONSE:
+    * OUTBOUND:
+
 ### 常用组件及功能
 
 * Spring Cloud Config: 外部的中央配置管理，通过git实现，配置资源直接与Spring的`Environment`映射，也可以被non-Spring应用使用
