@@ -1,0 +1,15 @@
+server:
+  port: 8080
+
+
+zuul: 
+  routes:
+    book:
+      url: http://localhost:8090
+
+ribbon:
+  eureka:
+    enable: false
+    
+logging:
+  file: log.txt
