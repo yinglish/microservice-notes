@@ -10,6 +10,3 @@ zuul:
 ribbon:
   eureka:
     enable: false
-    
-logging:
-  file: log.txt
