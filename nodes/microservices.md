@@ -53,6 +53,10 @@ Zuul结合其他的Netflix OSS组件能够提供insight, flexibility, and resill
 
 ### 常用组件及功能
 
+Zuul是一个基于JVM的路由器和服务端的负载均衡器
+
+Zuul的功能：Authentication鉴权、Insightes、压力测试、金丝雀测试、动态路由、服务迁移、Load Shedding、静态响应管理、主动流量管理
+
 * Spring Cloud Config: 外部的中央配置管理，通过git实现，配置资源直接与Spring的`Environment`映射，也可以被non-Spring应用使用
 
 * Spring Netflix
