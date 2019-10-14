@@ -167,6 +167,82 @@ response:
     Content-Type: application/json;charset=UTF-8
 ```
 
+运行`./mvnw clean install`命令，会自动的生成测试代码来验证应用是否与契约保持一致。默认情况下，生成的测试代码位于`org.springframework.cloud.contract.verifier.tests.`包下。
+
+默认的测试模式是HTTP契约下使用`MockMvc`，生成的代码类似于：
+
+```java
+@Test
+public void validate_shouldMarkClientAsFraud() throws Exception {
+    // given:
+    MockMvcRequestSpecification request = given()
+        .header("Content-Type", "application/vnd.fraud.v1+json")
+        .body("{\"client.id\":\"1234567890\",\"loanAmount\":99999}");
+    // when:
+    ResponseOptions response = given().spec(request)
+        .put("/fraudcheck");
+    // then:
+    assertThat(response.statusCode()).isEqualTo(200);
+    assertThat(response.header("ContentType")).matches("application/vnd.fraud.v1.json.*");
+    // and:
+    DocumentContext parsedJson = JsonPath.parse(response.getBody().asString());
+    assertThatJson(parsedJson).field("['fraudCheckStatus']").matches("[AZ]{5}");
+    assertThatJson(parsedJson).field("['rejection.reason']").isEqualTo("Amount too high");
+}
+```
+
+因为当前应用的功能还没有实现，所以测试无法通过。为了使得测试通过，需要实现能够实例契约中关于HTTP请求的功能，还需要在`pom`文件中配置基础测试类的路径等信息：
+
+```yaml
+<build>
+  <plugins>
+    <plugin>
+      <groupId>org.springframework.cloud</groupId>
+      <artifactId>spring-cloud-contract-maven-plugin</artifactId>
+      <version>2.1.2.RELEASE</version>
+      <extensions>true</extensions>
+      <configuration>
+        <baseClassForTests>com.example.contractTest.BaseTestClass</baseClassForTests> # 指定基础测试类
+      </configuration>
+    </plugin>
+    <plugin>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-maven-plugin</artifactId>
+    </plugin>
+  </plugins>
+</build>
+```
+
+一个最基本的基础测试类是这样的：
+
+```java
+
+package com.example.contractTest;
+import org.junit.Before;
+import io.restassured.module.mockmvc.RestAssuredMockMvc;
+public class BaseTestClass {
+    @Before
+    public void setup() {
+        RestAssuredMockMvc.standaloneSetup(new FraudController());
+    }
+}
+
+```
+
+### 服务消费方
+
+Spring Cloud Contract的Stub Runner在集成测试中运行WireMock实例模拟真实的服务。
+
+首先需要在消费者应用的`pom`文件中添加Spring Cloud Contract Stub Runner的依赖：
+
+```xml
+<dependency>
+  <groupId>org.springframework.cloud</groupId>
+  <artifactId>spring-cloud-starter-contract-stub-runner</artifactId>
+  <scope>test</scope>
+</dependency>
+```
+
 
 
 ## 功能特性
