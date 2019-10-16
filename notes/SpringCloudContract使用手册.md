@@ -243,9 +243,93 @@ Spring Cloud Contract的Stub Runner在集成测试中运行WireMock实例模拟�
 </dependency>
 ```
 
+有两种方式从Maven仓库中获得由服务提供方生成的stubs：
 
+* 拉取服务提供方的代码，添加契约，然后运行以下命令：
+  ```shell
+  cd local-http-server-repo
+  ./mvnw clean install -DskipTests
+  ```
+* 从远程仓库中获取已经存在的服务提供方的服务stubs，这个需要在配置文件中添加：
+```yaml
+stubrunner:
+  ids: 'com.example:http-server-dsl:+:stubs:8080'
+  repositoryRoot: https://repo.spring.io/libs-snapshot
+```
+
+接下来就可以在测试上写上`@AutoConfigureStubRunner`，并在注解中提供Spring Cloud Contract Stub Runner的`group-id`和` artifact-id`，例如：
+
+```java
+@RunWith(SpringRunner.class)
+@SpringBootTest(webEnvironment=WebEnvironment.NONE)
+@AutoConfigureStubRunner(ids = {"com.example:http-server-dsl:+:stubs:6565"},
+  stubsMode = StubRunnerProperties.StubsMode.LOCAL)
+public class LoanApplicationServiceTests {
+  ...
+}
+```
 
 ## 功能特性
+
+### Contract DSL
+
+Spring Cloud Contract支持用多种语言编写，支持的语言有：Groovy、YAML、Java、Kotlin。但我们推荐的方式是使用YAML，所以本手册的例子契约均是使用YAML编写。
+
+Spring Cloud Contract也支持在同一个文件中定义多个契约，一个典型的契约定义如下：
+
+```yaml
+description: Some description
+name: some name
+priority: 8
+ignored: true
+request:
+  url: /foo
+  queryParameters:
+  a: b
+  b: c
+  method: PUT
+  headers:
+  foo: bar
+  fooReq: baz
+  body:
+  foo: bar
+  matchers:
+  body:
+  - path: $.foo
+  type: by_regex
+  value: bar
+  headers:
+  - key: foo
+  regex: bar
+response:
+status: 200
+headers:
+foo2: bar
+foo3: foo33
+fooRes: baz
+body:
+foo2: bar
+foo3: baz
+nullValue: null
+matchers:
+body:
+- path: $.foo2
+type: by_regex
+value: bar
+- path: $.foo3
+type: by_command
+value: executeMe($it)
+- path: $.nullValue
+type: by_null
+value: null
+headers:
+- key: foo2
+regex: bar
+- key: foo3
+command: andMeToo($it)
+```
+
+
 
 ## 常见问题
 
