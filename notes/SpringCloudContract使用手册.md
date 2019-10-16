@@ -285,49 +285,57 @@ ignored: true
 request:
   url: /foo
   queryParameters:
-  a: b
-  b: c
+    a: b
+    b: c
   method: PUT
   headers:
-  foo: bar
-  fooReq: baz
+    foo: bar
+    fooReq: baz
   body:
-  foo: bar
+    foo: bar
   matchers:
-  body:
-  - path: $.foo
-  type: by_regex
-  value: bar
-  headers:
-  - key: foo
-  regex: bar
+    body:
+      - path: $.foo
+      type: by_regex
+      value: bar
+    headers:
+      - key: foo
+      regex: bar
 response:
-status: 200
-headers:
-foo2: bar
-foo3: foo33
-fooRes: baz
-body:
-foo2: bar
-foo3: baz
-nullValue: null
-matchers:
-body:
-- path: $.foo2
-type: by_regex
-value: bar
-- path: $.foo3
-type: by_command
-value: executeMe($it)
-- path: $.nullValue
-type: by_null
-value: null
-headers:
-- key: foo2
-regex: bar
-- key: foo3
-command: andMeToo($it)
+  status: 200
+  headers:
+    foo2: bar
+    foo3: foo33
+    fooRes: baz
+  body:
+    foo2: bar
+    foo3: baz
+    nullValue: null
+  matchers:
+    body:
+      - path: $.foo2
+        type: by_regex
+        value: bar
+      - path: $.foo3
+        type: by_command
+        value: executeMe($it)
+      - path: $.nullValue
+        type: by_null
+        value: null
+    headers:
+      - key: foo2
+        regex: bar
+      - key: foo3
+        command: andMeToo($it)
 ```
+
+在契约中，常见的顶层元素有：
+
+* Description：在契约中可以添加一段文本作为该契约的描述
+* Name：
+* Ignoring Contracts
+* Contracts in Progress
+* Passing Values from Files
 
 
 
