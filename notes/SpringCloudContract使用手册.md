@@ -331,13 +331,319 @@ response:
 
 在契约中，常见的顶层元素有：
 
-* Description：在契约中可以添加一段文本作为该契约的描述
-* Name：
-* Ignoring Contracts
-* Contracts in Progress
-* Passing Values from Files
+* Description：在契约中可以添加一段文本作为该契约的描述。
+* Name：契约的名称，如果契约的名称是`should register a user`，自动生成的测试代码为`validate_should_register_a_user`，在WireMock stub里面生成的stub的名字为`should_register_a_user.json`。
+* Ignoring Contracts：如果想要忽略某个契约，可以在插件配置中设置或者在契约中设置`ignored`属性值为`true`。
+* Contracts in Progress：`inProgress`值为`true`时，不会生成服务提供方的测试代码，只会生成对应的stubs。
+* Passing Values from Files：可以通过文件向契约中传值，例如，在契约文件的同一文件夹下有`request.json`和`response.json`，`yml`文件的内容可以是
+```yaml
+request:
+  method: GET
+  url: /foo
+  bodyFromFile: request.json
+response:
+  status: 200
+  bodyFromFile: response.json
+```
+其中JSON文件的内容是：
 
+```json
+// request.json
+{
+  "status": "REQUEST"
+}
+```
 
+```json
+// response.json
+{
+  "status": "RESPONSE"
+}
+```
+
+如果需要以二进制的形式向契约中传值，可以在YAML中使用`bodyFromFileAsBytes`字段。
+
+### Contracts for HTTP
+
+Spring Cloud Contract用来验证通过REST或HTTP通信的应用，使得符合契约`request`部分的请求，服务提供方的响应与`response`保持一致。通过契约能够生成WireMock stubs，对于符合契约的请求，能够从服务端得到合适的响应。
+
+#### HTTP顶级元素
+
+在契约的定义中，顶级的元素有：
+
+* request: 强制
+* response: 强制
+* priority：可选（数组越小，优先级越高）
+
+#### HTTP 请求
+
+在HTTP协议中，只要求请求中有请求方法与URL，在契约中的`request`部分关于这些信息是强制有的，如：
+
+```yaml
+method: PUT
+url: /foo
+```
+
+`url`既可以是相对路径也可以是绝对路径，推荐使用`urlPath`字段，如：
+
+```yaml
+request:
+  method: PUT
+  urlPath: /foo
+```
+
+`request`还可以包含查询参数，例如：
+
+```yaml
+request:
+...
+queryParameters:
+  a: b
+  b: c
+```
+
+`request`还可以包含额外的请求头信息，如：
+
+```yaml
+request:
+...
+headers:
+  foo: bar
+  fooReq: baz
+```
+
+`request`还可以包含额外的请求cookies信息，如：
+
+```yaml
+request:
+...
+cookies:
+  foo: bar
+  fooReq: baz
+```
+
+`request`还可以包含额外的请求体信息，如：
+
+```yaml
+request:
+...
+  body:
+  foo: ba
+```
+
+`request`还可以包含multipart元素，如：
+
+```yaml
+request:
+  method: PUT
+  url: /multipart
+  headers:
+    Content-Type: multipart/form-data;boundary=AaB03x
+  multipart:
+    params:
+      # key (parameter name), value (parameter value) pair
+      formParameter: '"formParameterValue"'
+      someBooleanParameter: true
+    named:
+      - paramName: file
+        fileName: filename.csv
+        fileContent: file content
+  matchers:
+    multipart:
+      params:
+        - key: formParameter
+          regex: ".+"
+        - key: someBooleanParameter
+          predefined: any_boolean
+      named:
+        - paramName: file
+          fileName:
+            predefined: non_empty
+          fileContent:
+            predefined: non_empty
+response:
+  status: 200
+```
+
+#### HTTP 响应
+
+响应必须包含状态码，还可以包含其他的一些信息，如：
+
+```yaml
+response:
+...
+status: 200
+```
+
+除了状态码，响应还可以包含的信息有头信息、cookies、体信息，这些信息的格式与请求中的格式是一致的。
+
+#### 动态属性
+
+契约还包含了一些动态属性，如时间戳、ID等。也可以在契约中使用正则表达式。
+
+### Spring Cloud Contract Stub Runner
+
+在使用Spring Cloud Contract Verifier的时候需要解决的一个问题是将服务端生成的WireMock JSON stubs传递给客户端。为了避免通过手动复制的方式解决这个问题，需要使用Spring Cloud Contract Stub Runner。
+
+#### 将Stubs以JARs包的方式进行发布
+
+最简单的方式就是将stubs以jar包的方式发布到仓库中，例如maven仓库。在maven中添加一下配置：
+
+```xml
+<!-- First disable the default jar setup in the properties section -->
+<!-- we don't want the verifier to do a jar for us -->
+<spring.cloud.contract.verifier.skip>true</spring.cloud.contract.verifier.skip><!-- Next add the assembly plugin to your build -->
+<!-- we want the assembly plugin to generate the JAR -->
+<plugin>
+    <groupId>org.apache.maven.plugins</groupId>
+    <artifactId>maven-assembly-plugin</artifactId>
+    <executions>
+        <execution>
+        <id>stub</id>
+        <phase>prepare-package</phase>
+        <goals>
+            <goal>single</goal>
+        </goals>
+        <inherited>false</inherited>
+        <configuration>
+            <attach>true</attach>
+            <descriptors>
+                ${basedir}/src/assembly/stub.xml
+            </descriptors>
+        </configuration>
+        </execution>
+    </executions>
+    </plugin>
+<!-- Finally setup your assembly. Below you can find the contents of
+src/main/assembly/stub.xml -->
+<assembly
+xmlns="http://maven.apache.org/plugins/maven-assembly-plugin/assembly/1.1.3"
+xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+xsi:schemaLocation="http://maven.apache.org/plugins/maven-assemblyplugin/assembly/1.1.3 https://maven.apache.org/xsd/assembly-1.1.3.xsd">
+    <id>stubs</id>
+    <formats>
+        <format>jar</format>
+    </formats>
+    <includeBaseDirectory>false</includeBaseDirectory>
+    <fileSets>
+        <fileSet>
+            <directory>src/main/java</directory>
+            <outputDirectory>/</outputDirectory>
+            <includes>
+            <include>**com/example/model/*.*</include>
+            </includes>
+        </fileSet>
+        <fileSet>
+            <directory>${project.build.directory}/classes</directory>
+            <outputDirectory>/</outputDirectory>
+            <includes>
+                <include>**com/example/model/*.*</include>
+            </includes>
+        </fileSet>
+        <fileSet>
+            <directory>${project.build.directory}/snippets/stubs</directory>
+            <outputDirectory>METAINF/${project.groupId}/${project.artifactId}/${project.version}/        mappings</    outputDi
+            rectory>
+            <includes>
+                <include>**/*</include>
+            </includes>
+        </fileSet>
+        <fileSet>
+            <directory>${basedir}/src/test/resources/contracts</directory>
+            <outputDirectory>METAINF/${project.groupId}/${project.artifactId}/${project.version}/            contracts</outputD
+            irectory>
+            <includes>
+                <include>**/*.groovy</include>
+            </includes>
+        </fileSet>
+    </fileSets>
+</assembly>
+```
+
+##### Stub Runner Core
+
+Stub Runner Core运行服务提供方的stubs，可以将stubs理解为服务方的使用契约，即stub-runner是消费驱动契约的一个实现。Stub Runner自动的下载依赖的stubs，并依据stub启动一个WireMock服务。
+
+使用时可以在项目的`pom`文件中添加：
+
+```xml
+<dependency>
+    <groupId>com.example</groupId>
+    <artifactId>beer-api-producer-restdocs</artifactId>
+    <classifier>stubs</classifier>
+    <version>0.0.1-SNAPSHOT</version>
+    <scope>test</scope>
+    <exclusions>
+        <exclusion>
+            <groupId>*</groupId>
+            <artifactId>*</artifactId>
+        </exclusion>
+    </exclusions>
+</dependency>
+<dependency>
+    <groupId>com.example.thing1</groupId>
+    <artifactId>thing2</artifactId>
+    <classifier>superstubs</classifier>
+    <version>1.0.0</version>
+    <scope>test</scope>
+    <exclusions>
+        <exclusion>
+            <groupId>*</groupId>
+            <artifactId>*</artifactId>
+        </exclusion>
+    </exclusions>
+</dependency>
+```
+
+##### 配置HTTP Server Stubs
+
+```java
+@CompileStatic
+static class HttpsForFraudDetection extends WireMockHttpServerStubConfigurer {
+    private static final Log log = LogFactory.getLog(HttpsForFraudDetection)
+    @Override
+    WireMockConfiguration configure(WireMockConfiguration httpStubConfiguration,
+        HttpServerStubConfiguration httpServerStubConfiguration) {
+        if (httpServerStubConfiguration.stubConfiguration.artifactId ==
+            "fraudDetectionServer") {
+            int httpsPort = SocketUtils.findAvailableTcpPort()
+            log.info("Will set HTTPs port [" + httpsPort + "] for fraud detection
+            server")
+            return httpStubConfiguration
+            .httpsPort(httpsPort)
+        }
+        return httpStubConfiguration
+    }
+}
+```
+
+##### 运行Stubs
+
+stubs是以JSON文档的形式定义的，它的语法可以参考WireMock文档，例如：
+
+```json
+{
+    "request": {
+        "method": "GET",
+        "url": "/ping"
+    },
+    "response": {
+        "status": 200,
+        "body": "pong",
+        "headers": {
+            "Content-Type": "text/plain"
+        }
+    }
+}
+```
+
+##### 查看注册的映射
+
+所有的调用服务的stub在`__/admin/`端点暴露了一个映射的列表，可以使用`mappingsOutputFolder`属性将这些信息写入到文件中。
+
+#### 在Spring Cloud中使用Stub Runner
+
+Spring Runner可以与Spring Cloud集成。
 
 ## 常见问题
 
